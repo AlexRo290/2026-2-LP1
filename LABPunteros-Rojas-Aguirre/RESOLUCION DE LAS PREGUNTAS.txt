@@ -1,0 +1,92 @@
+1.1 Arreglo unidimensional: recorrido y estadísticas
+ Preguntas guía:
+
+a) ¿Cómo se relaciona datos[i] con *(datos + i)? Probar ambas formas y
+confirmar que dan el mismo resultado.
+
+son equivalentes. Cuando usamos un array en una expresión, su nombre se convierte a un puntero a su primer elemento. `datos + i` es aritmética de punteros: el i avanza posiciones (cada posición que avanza es del tamaño de 'int') y `*` desreferencia esa dirección para obtener el valor ahí guardado. `datos[2]` y `*(datos + 2)` imprimen el mismo valor confirmándolo.
+
+b) ¿Qué pasa si imprimen sizeof(datos) / sizeof(datos[0])? ¿Y si datos fuera un
+parámetro de función?
+
+`datos` es un array real, así que `sizeof(datos)` da el tamaño total en bytes ( 40 bytes), y `sizeof(datos[0])` da el tamaño de un elemento (4 bytes). 
+
+Si `datos` fuera un parámetro de función (`void f(int datos[])` o `void f(int *datos)`), dentro de esa función `datos` ya no es un array — es un puntero. `sizeof(datos)` ahí daría el tamaño de un puntero (típicamente 8 bytes en sistemas de 64 bits), no el tamaño del array completo.
+
+1.2 Arreglo bidimensional: matriz y operaciones
+
+a) ¿Cómo se almacena int m[3][4] en memoria? ¿Es un bloque contiguo?
+Verifíquenlo imprimiendo &m[0][0], &m[0][1], &m[1][0] y observando las
+diferencias.
+
+Sí, es un bloque contiguo de memoria — C almacena matrices bidimensionales en orden de fila principal : primero todos los elementos de la fila 0, luego todos los de la fila 1, etc., uno justo después del otro, sin huecos. La prueba en el programa lo confirma:
+
+&m[0][0] = 0x...060
+&m[0][1] = 0x...064   (4 bytes despues: el siguiente int de la misma fila)
+&m[1][0] = 0x...070   (16 bytes despues de &m[0][0]: salto de una fila completa = 4 ints x 4 bytes)
+```
+La diferencia entre `&m[0][0]` y `&m[0][1]` es de 4 bytes (`sizeof(int)`), confirmando que los elementos de una fila son consecutivos. La diferencia entre `&m[0][0]` y `&m[1][0]` es de 16 bytes (4 columnas × 4 bytes), confirmando que las filas están una justo después de otra, sin separación.
+
+b) ¿Cuál es la diferencia entre m[i][j] y *(*(m + i) + j)?
+
+Son equivalentes, igual que vimos con el array 1D, pero con un nivel extra de indirección. `m` decae a un puntero al primer elemento de `m`, que es "un array de 4 ints" (es decir, `m` es un puntero a arrays de 4 `int`). `m + i` avanza `i` "filas completas" (cada una de 4 ints), y `*(m + i)` da esa fila, que a su vez decae a un puntero a su primer `int`. Sumarle `j` y desreferenciar (`*( ... + j)`) te da el elemento específico. En el programa, `m[1][2]` y `*(*(m+1)+2)` dan el mismo valor (`7`).
+
+2.1 Declaración, desreferencia y dirección
+
+a) ¿Por qué printf("%p", p) requiere el cast (void *)? (Es por portabilidad y por
+las reglas de variadic functions.)
+
+`%p` espera un argumento de tipo `void *`. Las funciones (como `printf`, que aceptan un número variable de argumentos) no hacen conversión automática de tipos de punteros entre sí — a diferencia de una llamada a función normal con parámetros fijos, donde el compilador sí podría convertir implícitamente. Sin el cast explícito, pasar un `int *` donde se espera `void *`, aunque en la práctica funcione en la mayoría de plataformas (por portabilidad real, distintos tipos de puntero *podrían* tener representaciones distintas en algunas arquitecturas exóticas). El cast `(void *)p` fuerza la conversión correcta y elimina cualquier ambigüedad o *warning* del compilador.
+
+b) ¿Qué diferencia hay entre int *p e int* p? ¿Y entre int *p, q y int *p, *q?
+
+Ninguna diferencia para el compilador. Solo cambia la estética del estilo de código.
+int *p, q; declara p como puntero a entero y q como un entero normal.   int *p, *q; declara ambos (p y q) como punteros a entero.   
+
+2.2 Aritmética de punteros sobre arreglos
+
+a) Concepto clave: p + 5 no suma 5 bytes, suma 5 * sizeof(int) bytes.
+Verifíquenlo imprimiendo (char *)p y (char *)(p+5) y calculando la diferencia
+en bytes con (char *)(p+5) - (char *)p.
+
+La aritmética de punteros escala por el tamaño del tipo de dato (sizeof(int) = 4 bytes). Al convertir a (char *) se fuerza la aritmética a nivel de byte individual; por eso (char *)(p+5) - (char *)p da 20 bytes (5 x 4). 
+
+b) ¿Por qué p[i] es exactamente *(p + i)? ¿Qué dice el estándar C al respecto?
+
+Porque en el estándar de C el operador de subíndice E1[E2] está definido sintácticamente como *((E1) + (E2)). No es más que azúcar sintáctico
+
+c) ¿Por qué 3[p] compila? Explicar la conmutatividad de + y la definición de [].
+
+Por la definición anterior: 3[p] se traduce a *(3 + p). Como la suma es conmutativa (3 + p es igual a p + 3), ambas expresiones son exactamente iguales
+
+d) Trampa: ¿qué pasa con p + 8 (uno más allá del último elemento)? ¿Es válido
+crearlo? ¿Se puede desreferenciar?
+
+Sí. El estándar permite apuntar un elemento más allá del final del arreglo para usarlo como límite de control en bucles.
+
+ No. Intentar acceder a su valor (*(p + 8)) causa un comportamiento no definido (acceso a memoria no reservada).
+
+2.3 Punteros a char y cadenas literales
+
+a) ¿Cuál es la diferencia entre char *s = "..." y char s[] = "..." en términos de
+memoria?
+
+char *s guarda un puntero en el stack que apunta a memoria de solo lectura (.rodata). char s[] reserva espacio en el stack y copia los caracteres ahí, permitiendo su modificación.
+
+b) ¿Por qué intentar modificar un literal de cadena es comportamiento no
+definido?
+
+Porque las cadenas literales están en segmentos de memoria protegidos contra escritura por el sistema operativo. Intentar modificar los bytes causa una violación de acceso
+
+c) ¿Cuándo conviene cada declaración?
+
+char *s: Para cadenas constantes de solo lectura o punteros reasignables.   
+char s[]: Para textos que necesites modificar, concatenar o editar en memoria local. 
+
+
+
+
+
+
+
+
